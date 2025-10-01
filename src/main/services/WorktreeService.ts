@@ -289,6 +289,21 @@ export class WorktreeService {
   }
 
   /**
+   * Get the default branch of a repository
+   */
+  private async getDefaultBranch(projectPath: string): Promise<string> {
+    try {
+      const { stdout } = await execAsync("git remote show origin", {
+        cwd: projectPath,
+      });
+      const match = stdout.match(/HEAD branch:\s*(\S+)/);
+      return match ? match[1] : "main";
+    } catch {
+      return "main";
+    }
+  }
+
+  /**
    * Merge worktree changes back to main branch
    */
   async mergeWorktreeChanges(
@@ -301,8 +316,10 @@ export class WorktreeService {
         throw new Error("Worktree not found");
       }
 
-      // Switch to main branch
-      await execAsync("git checkout main", { cwd: projectPath });
+      const defaultBranch = await this.getDefaultBranch(projectPath);
+
+      // Switch to default branch
+      await execAsync(`git checkout ${defaultBranch}`, { cwd: projectPath });
 
       // Merge the worktree branch
       await execAsync(`git merge ${worktree.branch}`, { cwd: projectPath });
