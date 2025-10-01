@@ -20,6 +20,23 @@ export class WorktreeService {
   private worktrees = new Map<string, WorktreeInfo>();
 
   /**
+   * Detect the default branch for a repository
+   */
+  private async getDefaultBranch(projectPath: string): Promise<string> {
+    try {
+      const { stdout } = await execAsync("git symbolic-ref refs/remotes/origin/HEAD", { cwd: projectPath });
+      return stdout.trim().replace("refs/remotes/origin/", "");
+    } catch {
+      try {
+        const { stdout } = await execAsync("git remote show origin", { cwd: projectPath });
+        const match = stdout.match(/HEAD branch:\s*(\S+)/);
+        if (match) return match[1];
+      } catch {}
+      return "main";
+    }
+  }
+
+  /**
    * Create a new Git worktree for an agent workspace
    */
   async createWorktree(
@@ -301,8 +318,9 @@ export class WorktreeService {
         throw new Error("Worktree not found");
       }
 
-      // Switch to main branch
-      await execAsync("git checkout main", { cwd: projectPath });
+      // Switch to default branch
+      const defaultBranch = await this.getDefaultBranch(projectPath);
+      await execAsync(`git checkout ${defaultBranch}`, { cwd: projectPath });
 
       // Merge the worktree branch
       await execAsync(`git merge ${worktree.branch}`, { cwd: projectPath });
